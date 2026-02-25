@@ -2,9 +2,18 @@
 
 **Agent-native CLI for prediction market intelligence.**
 
-Aggregates data from Polymarket, Kalshi, and Metaculus. Cross-references with real-time sentiment from news and Reddit. Surfaces divergences where crowds disagree with real-world signals and arbitrage opportunities across platforms.
+vibe-dash is an agent-native CLI intelligence layer for prediction markets. It does NOT re-implement market data fetching. Instead, it composes with existing CLIs (starting with polymarket-cli) and adds the intelligence layer on top: cross-platform aggregation, real-world sentiment analysis, divergence detection, and arbitrage discovery.
 
-Built for agents. Every command outputs structured JSON, is composable via unix pipes, and ships with a SKILL.md so AI agents (Claude Code, Codex, etc.) can use it out of the box.
+Think of it as: **polymarket-cli is the data pipe. vibe-dash is the brain.**
+
+### Core Philosophy (from Karpathy)
+
+> "CLIs are super exciting precisely because they are a 'legacy' technology, which means AI agents can natively and easily use them, combine them... Even more powerful when you use it as a module of bigger pipelines."
+
+vibe-dash embodies this. It's a CLI that agents can install, compose, and build dashboards/apps on top of. It treats polymarket-cli (and future CLIs like kalshi, metaculus) as upstream data sources and focuses exclusively on what they don't provide: analysis, enrichment, signals, and cross-source intelligence.
+
+Every command outputs structured JSON, is composable via unix pipes, and ships with a SKILL.md so AI agents (Claude Code, Codex, etc.) can use it out of the box.
+
 
 ## Install
 
