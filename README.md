@@ -42,8 +42,17 @@ cargo install --path .
 ## Quick Start
 
 ```bash
-# Search prediction markets
+# Search prediction markets across all platforms
 oddsense search "bitcoin" --limit 5
+
+# Search with semantic expansion (finds "artificial intelligence" when you search "AI")
+oddsense search "AI regulation" --sources kalshi --limit 10
+
+# Filter by category
+oddsense search "crypto" --category economics --limit 5
+
+# LLM-powered smart search (requires Anthropic API key)
+oddsense search "election 2028" --smart --limit 10
 
 # Get sentiment signals
 oddsense enrich "AI regulation" --sources reddit
@@ -58,24 +67,34 @@ oddsense signals --min-volume 50000
 oddsense arbitrage --min-spread 5
 
 # Compare the same question across platforms
-oddsense compare "Harvey Weinstein" --sources polymarket,kalshi
+oddsense compare "bitcoin" --sources polymarket,kalshi
 ```
 
 ## Commands
 
 | Command | Description |
 |---|---|
-| `search <query>` | Search prediction markets via polymarket-cli |
+| `search <query>` | Search prediction markets across Polymarket, Kalshi, and Metaculus with semantic search |
 | `enrich <query>` | Fetch sentiment signals (news + Reddit) |
 | `divergence <query>` | Find markets where odds diverge from sentiment |
 | `signals` | Surface trending markets by volume/momentum |
 | `arbitrage [query]` | Find cross-platform pricing differences |
 | `compare <query>` | Side-by-side comparison across platforms |
 
+### Search Flags
+
+```
+--sources <list>      polymarket,kalshi,metaculus,all (default: all)
+--category <cat>      Filter: politics, economics, technology, crypto, sports, science, geopolitics, culture
+--limit <n>           Max results (default: 10)
+--sort <field>        Sort by: volume_num, created_at (default: volume_num)
+```
+
 ### Global Flags
 
 ```
 --format json|table   Output format (default: table)
+--smart, -s           LLM-powered query expansion + result reranking (requires API key)
 --quiet, -q           Suppress non-data output (stderr)
 --raw                 Raw JSON, no pretty-printing
 --config <path>       Custom config file path
@@ -88,11 +107,16 @@ Create `~/.config/oddsense/config.toml` (macOS: `~/Library/Application Support/c
 ```toml
 [api_keys]
 newsapi = "your-newsapi-key-here"
+anthropic = "sk-ant-..."          # for --smart mode
 
 [defaults]
 format = "table"
 refresh_seconds = 60
 sources = ["polymarket"]
+
+[llm]
+provider = "anthropic"
+model = "claude-haiku-4-5-20251001"  # optional
 ```
 
 ### API Keys
@@ -104,6 +128,7 @@ sources = ["polymarket"]
 | Reddit | No | Free public JSON API |
 | NewsAPI | Yes | [newsapi.org](https://newsapi.org/) (free tier: 100 req/day) |
 | Metaculus | Yes | API requires auth (gracefully skipped if unavailable) |
+| Anthropic | For `--smart` | [console.anthropic.com](https://console.anthropic.com/) or set `ANTHROPIC_API_KEY` env var |
 
 ## Agent Usage
 
@@ -130,29 +155,30 @@ See [SKILL.md](SKILL.md) for full agent instructions.
 oddsense follows a **composition over reimplementation** pattern. For Polymarket, we shell out to `polymarket-cli` and parse its JSON output — no need to reimplement auth, CLOB interaction, or API wrappers. For platforms without existing CLIs (Kalshi, Metaculus), we call their APIs directly.
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                      oddsense                          │
-│                  (intelligence layer)                   │
-│                                                         │
-│  ┌──────────┐  ┌────────────┐  ┌─────────────────────┐  │
-│  │ Sentiment│  │ Divergence │  │   Cross-Platform    │  │
-│  │ Engine   │  │ Detector   │  │   Arbitrage Finder  │  │
-│  └────┬─────┘  └─────┬──────┘  └──────────┬──────────┘  │
-│       │              │                     │             │
-│  ┌────┴──────────────┴─────────────────────┴──────────┐  │
-│  │              Unified Market Schema                 │  │
-│  │         (normalize all sources into one)           │  │
-│  └────┬──────────────┬─────────────────────┬──────────┘  │
-│       │              │                     │             │
-│  ┌────┴────┐   ┌─────┴─────┐   ┌──────────┴──────────┐  │
-│  │Polymarket│  │  Kalshi   │   │   Metaculus         │  │
-│  │ Adapter  │  │  Adapter  │   │   Adapter           │  │
-│  │(via CLI) │  │ (via API) │   │   (via API)         │  │
-│  └──────────┘  └───────────┘   └─────────────────────┘  │
-└─────────────────────────────────────────────────────────┘
-        │               │                    │
-   polymarket-cli    Kalshi API         Metaculus API
-   (subprocess)      (direct HTTP)      (direct HTTP)
+┌──────────────────────────────────────────────────────────────┐
+│                         oddsense                             │
+│                    (intelligence layer)                       │
+│                                                              │
+│  ┌───────────┐ ┌────────────┐ ┌────────────┐ ┌───────────┐  │
+│  │ Semantic  │ │ Sentiment  │ │ Divergence │ │ Arbitrage │  │
+│  │ Search    │ │ Engine     │ │ Detector   │ │ Finder    │  │
+│  │ + LLM    │ │ (negation) │ │            │ │           │  │
+│  └─────┬─────┘ └─────┬──────┘ └─────┬──────┘ └─────┬─────┘  │
+│        │              │              │              │         │
+│  ┌─────┴──────────────┴──────────────┴──────────────┴──────┐ │
+│  │              Unified Market Schema                       │ │
+│  │      (normalize all sources + category tagging)          │ │
+│  └─────┬──────────────┬──────────────────────┬─────────────┘ │
+│        │              │                      │               │
+│  ┌─────┴─────┐  ┌─────┴──────┐  ┌───────────┴────────────┐  │
+│  │Polymarket │  │  Kalshi    │  │   Metaculus            │  │
+│  │ Adapter   │  │  Adapter   │  │   Adapter              │  │
+│  │(via CLI)  │  │ (via API)  │  │   (via API)            │  │
+│  └───────────┘  └────────────┘  └────────────────────────┘  │
+└──────────────────────────────────────────────────────────────┘
+        │               │                      │
+   polymarket-cli    Kalshi API           Metaculus API
+   (subprocess)      (direct HTTP)        (direct HTTP)
 ```
 
 ### Source Adapters
@@ -160,21 +186,24 @@ oddsense follows a **composition over reimplementation** pattern. For Polymarket
 | Adapter | Method | Auth |
 |---|---|---|
 | **Polymarket** | Shells out to `polymarket-cli` subprocess, parses JSON | None (public) |
-| **Kalshi** | Direct REST API (`api.elections.kalshi.com`) | None (read-only) |
+| **Kalshi** | Direct REST API (`api.elections.kalshi.com`) with semantic search | None (read-only) |
 | **Metaculus** | Direct REST API (`metaculus.com/api2`) | Required (skipped if unavailable) |
-| **Sentiment** | NewsAPI + Reddit public JSON API | NewsAPI key (optional) |
+| **Sentiment** | NewsAPI + Reddit public JSON API, negation-aware scoring | NewsAPI key (optional) |
 | **Arbitrage** | Jaro-Winkler fuzzy title matching across all sources | N/A |
+| **LLM (smart)** | Anthropic Claude API for query expansion + reranking | Anthropic API key |
 
 ### Project Structure
 
 ```
 src/
   adapters/        # Market source adapters (polymarket, kalshi, metaculus)
+  search/          # Synonym expansion, relevance scoring, category tagging
+  llm/             # LLM integration (Anthropic) for --smart mode
   analysis/        # Divergence detection, arbitrage matching
-  sentiment/       # News + Reddit sentiment scoring
+  sentiment/       # News + Reddit sentiment scoring (with negation handling)
   cli/             # Command handlers
   output/          # JSON + table formatters
-  config.rs        # Config file management
+  config.rs        # Config file management + LLM config
 ```
 
 ## Use Cases

@@ -24,6 +24,8 @@ oddsense embodies this. It's a CLI that agents can install, compose, and build d
 - **Output**: `tabled` for table output, raw JSON for piping
 - **Config**: `directories` crate + `toml` for config
 - **Errors**: `anyhow` (binary) + `thiserror` (library)
+- **Search**: `strsim` for Jaro-Winkler similarity, `std::sync::LazyLock` for static synonym maps
+- **LLM**: Anthropic Claude API (via `reqwest`) for smart query expansion & reranking (optional, behind `--smart` flag)
 - **External dep**: `polymarket-cli` (invoked via `std::process::Command`, parsed via JSON output)
 
 ---
@@ -75,7 +77,8 @@ oddsense/
 │   ├── lib.rs               # Re-exports
 │   │
 │   ├── cli/                 # Command handlers
-│   │   ├── mod.rs           # Subcommand routing
+│   │   ├── mod.rs           # Subcommand routing + CLI arg structs
+│   │   ├── search.rs        # `search` — multi-source market search with --smart and --category
 │   │   ├── enrich.rs        # `enrich` — add sentiment to market data
 │   │   ├── divergence.rs    # `divergence` — find market vs reality gaps
 │   │   ├── arbitrage.rs     # `arbitrage` — cross-platform odds comparison
@@ -85,16 +88,24 @@ oddsense/
 │   │
 │   ├── adapters/            # Data source adapters
 │   │   ├── mod.rs           # MarketSource trait + registry
-│   │   ├── schema.rs        # Unified NormalizedMarket struct
+│   │   ├── schema.rs        # Unified NormalizedMarket struct + is_expired()
 │   │   ├── polymarket.rs    # Wraps polymarket-cli subprocess
-│   │   ├── kalshi.rs        # Direct Kalshi API client
+│   │   ├── kalshi.rs        # Direct Kalshi API client (semantic search via expanded_relevance_score)
 │   │   └── metaculus.rs     # Direct Metaculus API client
+│   │
+│   ├── search/              # Search intelligence (v0.2.0)
+│   │   ├── mod.rs           # Synonym expansion, relevance scoring, expanded_relevance_score()
+│   │   └── categories.rs    # Rule-based market categorization (MarketCategory enum)
+│   │
+│   ├── llm/                 # LLM integration (v0.2.0, behind --smart flag)
+│   │   ├── mod.rs           # QueryExpansion, RankedResult, RerankResponse structs
+│   │   └── provider.rs      # AnthropicProvider — query expansion + result reranking
 │   │
 │   ├── sentiment/           # Sentiment analysis engines
 │   │   ├── mod.rs           # SentimentSource trait + aggregator
 │   │   ├── news.rs          # NewsAPI / RSS feed analysis
 │   │   ├── reddit.rs        # Reddit API sentiment
-│   │   └── scorer.rs        # Keyword + heuristic sentiment scorer
+│   │   └── scorer.rs        # Keyword + negation-aware sentiment scorer
 │   │
 │   ├── analysis/            # Core intelligence algorithms
 │   │   ├── mod.rs
@@ -109,7 +120,7 @@ oddsense/
 │   │   ├── table.rs         # Pretty tables (default for humans)
 │   │   └── tui.rs           # Ratatui live dashboard
 │   │
-│   └── config.rs            # Config loading, API key management
+│   └── config.rs            # Config loading, API key management, LLM config
 │
 └── tests/
     ├── integration/
@@ -507,30 +518,24 @@ oddsense/
 **Goal**: Persistent config, caching, and full agent-readiness.
 
 1. Implement `config.rs`:
-   - Config at `~/.config/oddsense/config.toml`:
+   - Config at `~/.config/oddsense/config.toml` (macOS: `~/Library/Application Support/com.oddsense.oddsense/config.toml`):
      ```toml
      [api_keys]
      newsapi = "your-key-here"
+     anthropic = "sk-ant-..."   # for --smart mode (LLM query expansion + reranking)
+     openai = ""                # future: alternative to anthropic
      # kalshi and metaculus don't need keys for read
-
-     [sources]
-     # Which prediction market sources to use by default
-     markets = ["polymarket"]   # add "kalshi", "metaculus" as implemented
-     sentiment = ["news"]       # add "reddit" as implemented
 
      [defaults]
      format = "table"
      refresh_seconds = 60
-     divergence_min_score = 20
-     arbitrage_min_spread = 5.0
+     sources = ["polymarket"]
 
-     [cache]
-     enabled = true
-     ttl_seconds = 300          # cache sentiment results for 5 min
-
-     [polymarket_cli]
-     path = "polymarket"        # custom path to polymarket binary if not in PATH
+     [llm]
+     provider = "anthropic"                   # or "openai" (future)
+     model = "claude-haiku-4-5-20251001"      # optional model override
      ```
+   - Environment variable fallback: `ANTHROPIC_API_KEY` is checked if config key is empty
 2. Implement basic file-based caching:
    - Cache dir: `~/.cache/oddsense/`
    - Cache key: `{source}_{query}_{timestamp_bucket}.json`
@@ -651,9 +656,21 @@ FLAGS:
 oddsense dashboard --refresh 30 --panels divergence,momentum
 ```
 
+### `oddsense search <query>`
+Search prediction markets across Polymarket, Kalshi, and Metaculus with semantic search.
+```
+FLAGS:
+  --sources <list>       Comma-separated: polymarket,kalshi,metaculus,all (default: all)
+  --category <cat>       Filter by category: politics, economics, technology, crypto, sports, science, geopolitics, culture
+  --limit <n>            Max results (default: 10)
+  --sort <field>         Sort by: volume_num, created_at (default: volume_num)
+  --format <format>      json | table (default: table)
+```
+
 ### Global Flags (all commands)
 ```
   --format <format>      json | table (default: table)
+  --smart, -s            LLM-powered query expansion + result reranking (requires Anthropic API key)
   --quiet, -q            Suppress non-data output
   --raw                  Unformatted JSON (for piping)
   --no-cache             Bypass cache
@@ -809,29 +826,43 @@ polymarket clob market-order --token $MARKET --side buy --amount 5
 
 ---
 
-## Definition of Done (v0.1.0)
+## Definition of Done (v0.1.0) — COMPLETE
 
-- [ ] `oddsense enrich <query>` returns sentiment scores from news + reddit
-- [ ] `oddsense divergence <query>` compares polymarket odds vs sentiment
-- [ ] `oddsense signals` shows momentum and volume-weighted market movers
+- [x] `oddsense enrich <query>` returns sentiment scores from news + reddit
+- [x] `oddsense divergence <query>` compares polymarket odds vs sentiment
+- [x] `oddsense signals` shows momentum and volume-weighted market movers
 - [ ] `oddsense dashboard` launches a basic TUI with divergence + signals panels
-- [ ] Polymarket adapter works via polymarket-cli subprocess with proper error handling
-- [ ] All commands support `--format json` with documented schemas
+- [x] Polymarket adapter works via polymarket-cli subprocess with proper error handling
+- [x] All commands support `--format json` with documented schemas
 - [ ] All commands support `--stdin` for piped composition
-- [ ] Proper exit codes (0=success, 1=error, 2=no results)
-- [ ] stderr/stdout separation works correctly
-- [ ] Config file with API key management
+- [x] Proper exit codes (0=success, 1=error)
+- [x] stderr/stdout separation works correctly
+- [x] Config file with API key management
 - [ ] Basic TTL caching for sentiment results
-- [ ] SKILL.md is complete
-- [ ] README.md with install, quickstart, and pipeline examples
+- [x] SKILL.md is complete
+- [x] README.md with install, quickstart, and pipeline examples
 
-## Definition of Done (v0.2.0)
+## Definition of Done (v0.2.0) — COMPLETE
 
-- [ ] Kalshi adapter (direct API)
-- [ ] Metaculus adapter (direct API)
-- [ ] `oddsense arbitrage` cross-platform spread detection
-- [ ] `oddsense compare` side-by-side platform comparison
-- [ ] Fuzzy matching for cross-platform question pairing
+- [x] Kalshi adapter (direct API) with semantic search via expanded_relevance_score()
+- [x] Metaculus adapter (direct API)
+- [x] `oddsense arbitrage` cross-platform spread detection
+- [x] `oddsense compare` side-by-side platform comparison
+- [x] Fuzzy matching for cross-platform question pairing (Jaro-Winkler)
+- [x] Semantic search with synonym expansion (~50 domain groups)
+- [x] `--category` filter for market categorization
+- [x] `--smart` flag for LLM-powered query expansion and result reranking
+- [x] Negation-aware sentiment scoring
+- [x] Expired market filtering
+- [x] Published to crates.io + GitHub
 - [ ] Correlation cluster detection in signals
 - [ ] Full TUI dashboard with all 4 panels
-- [ ] Published to crates.io / GitHub releases with prebuilt binaries
+
+## Definition of Done (v0.3.0)
+
+- [ ] Correlation cluster detection in signals
+- [ ] Full TUI dashboard with all 4 panels
+- [ ] Basic TTL caching for sentiment results
+- [ ] `--stdin` for piped composition
+- [ ] OpenAI provider support for `--smart`
+- [ ] Prebuilt binaries via GitHub releases

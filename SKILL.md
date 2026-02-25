@@ -4,7 +4,7 @@
 
 ## What is oddsense?
 
-A CLI tool for prediction market intelligence. It aggregates data from Polymarket, Kalshi, and Metaculus, cross-references with news/Reddit sentiment, and detects divergences and arbitrage opportunities.
+A CLI tool for prediction market intelligence. It aggregates data from Polymarket, Kalshi, and Metaculus, cross-references with news/Reddit sentiment, and detects divergences and arbitrage opportunities. Features semantic search with synonym expansion, LLM-powered smart search (via `--smart`), rule-based market categorization, and negation-aware sentiment scoring.
 
 ## Installation
 
@@ -16,8 +16,10 @@ cargo install --git https://github.com/Polymarket/polymarket-cli.git
 ## Commands
 
 ### `oddsense search <query>`
-Search prediction markets for a topic.
+Search prediction markets across Polymarket, Kalshi, and Metaculus. Uses semantic search with synonym expansion (e.g., "AI" finds "artificial intelligence", "machine learning"). Optionally use `--smart` for LLM-powered query expansion and result reranking.
 ```
+--sources <list>  polymarket,kalshi,metaculus,all (default: all)
+--category <cat>  Filter: politics, economics, technology, crypto, sports, science, geopolitics, culture
 --limit <n>       Max results (default: 10)
 --sort <field>    Sort by: volume_num, created_at (default: volume_num)
 --format json     JSON output
@@ -25,12 +27,24 @@ Search prediction markets for a topic.
 --raw             No pretty-printing
 ```
 
+**Examples:**
+```bash
+# Multi-source search
+oddsense search "AI regulation" --sources kalshi --limit 5
+
+# Category filter
+oddsense search "crypto" --category economics --limit 5
+
+# LLM-powered smart search
+oddsense search "election 2028" --smart --limit 10
+```
+
 **JSON schema:**
 ```json
 {
   "count": 5,
   "query": "bitcoin",
-  "source": "polymarket",
+  "source": "polymarket+kalshi",
   "markets": [
     {
       "id": "string",
@@ -214,12 +228,28 @@ oddsense arbitrage --format json -q --raw | \
 - `0`: Success (even if no results — check `count` field)
 - `1`: Error (API failure, missing dependency, etc.)
 
+## Global Flags
+
+All commands support these flags:
+```
+--smart, -s       LLM-powered query expansion + result reranking (requires Anthropic API key)
+--format json     JSON output (default: table)
+--quiet, -q       Suppress all stderr output
+--raw             Disable JSON pretty-printing (for piping)
+--config <path>   Custom config file path
+```
+
 ## Notes
 
 - Data goes to stdout, human messages to stderr
 - `--quiet` suppresses all stderr output
 - `--raw` disables JSON pretty-printing (for piping)
+- Search uses semantic expansion by default (synonym matching, no API key needed)
+- `--smart` adds LLM query expansion + result reranking (requires `ANTHROPIC_API_KEY` env var or `anthropic` key in config.toml)
+- `--smart` gracefully falls back to synonym expansion if no API key is configured
+- `--category` filters results using rule-based categorization (no API key needed)
 - Requires `polymarket-cli` in PATH for Polymarket commands
 - NewsAPI key needed for news sentiment (set in config.toml)
 - Kalshi and Reddit work without API keys
 - Metaculus requires auth — skipped gracefully if unavailable
+- Expired markets are automatically filtered from results
