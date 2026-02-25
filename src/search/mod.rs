@@ -51,10 +51,11 @@ static SYNONYMS: LazyLock<HashMap<&'static str, &'static [&'static str]>> = Lazy
     m.insert("budget", &["spending", "fiscal", "deficit", "debt"][..]);
 
     // Regulation & Policy
-    m.insert("regulation", &["policy", "law", "legislation", "ban", "rule", "act"][..]);
-    m.insert("policy", &["regulation", "law", "legislation", "rule"][..]);
+    // Avoid overly generic single words like "act", "rule" — they cause false positives
+    m.insert("regulation", &["policy", "legislation", "regulatory", "oversight", "compliance"][..]);
+    m.insert("policy", &["regulation", "legislation", "regulatory"][..]);
     m.insert("ban", &["prohibition", "outlaw", "block", "restrict"][..]);
-    m.insert("legislation", &["law", "bill", "act", "regulation"][..]);
+    m.insert("legislation", &["bill", "regulation", "legislative"][..]);
 
     // Geopolitics & War
     m.insert("war", &["conflict", "military", "invasion", "ceasefire", "troops"][..]);
@@ -168,13 +169,57 @@ pub fn relevance_score(query: &str, title: &str) -> f64 {
 }
 
 /// Score a title against a query and all its expanded variants.
-/// Returns the maximum score across all variants.
+/// Returns the maximum score across all variants, with a penalty
+/// for variants that only match on synonym words (not original words).
 pub fn expanded_relevance_score(query: &str, title: &str) -> f64 {
     let variants = expand_query(query);
-    variants
-        .iter()
-        .map(|q| relevance_score(q, title))
-        .fold(0.0_f64, f64::max)
+    let original_lower = query.to_lowercase();
+    let original_words: Vec<&str> = original_lower.split_whitespace().collect();
+    let t_lower = title.to_lowercase();
+    let t_words: Vec<String> = t_lower
+        .split(|c: char| !c.is_alphanumeric())
+        .filter(|w| !w.is_empty())
+        .map(String::from)
+        .collect();
+
+    // Check if the title is semantically connected to the original query.
+    // A title is connected if:
+    // 1. Any original query word appears as a whole word in the title, OR
+    // 2. Any multi-word synonym of an original word appears in the title
+    //    (e.g., "ai" → "artificial intelligence" found in title)
+    let has_semantic_connection = original_words.iter().any(|ow| {
+        // Direct whole-word match
+        if t_words.iter().any(|tw| tw == ow) {
+            return true;
+        }
+        // Multi-word synonym match (check if any synonym phrase is a substring of title)
+        if let Some(syns) = SYNONYMS.get(ow) {
+            for syn in *syns {
+                if syn.contains(' ') && t_lower.contains(syn) {
+                    return true;
+                }
+            }
+        }
+        false
+    });
+
+    let mut best = 0.0_f64;
+    for variant in &variants {
+        let score = relevance_score(variant, title);
+        if score > best {
+            best = score;
+        }
+    }
+
+    // If the title has no semantic connection to any original query word,
+    // heavily discount — it only matched via generic synonym substitution.
+    // This prevents "AI regulation" → "ai act" → matching "Insurrection Act"
+    // but allows "AI regulation" → "artificial intelligence policy" → matching correctly.
+    if !has_semantic_connection && original_words.len() > 1 {
+        best *= 0.3;
+    }
+
+    best
 }
 
 #[cfg(test)]
@@ -218,5 +263,19 @@ mod tests {
         // "AI" should NOT match "villain" (the old substring bug)
         let score = expanded_relevance_score("AI", "Will Adam Driver perform as Villain?");
         assert!(score < 0.1, "Expected no match for villain, got {}", score);
+    }
+
+    #[test]
+    fn test_expanded_no_generic_synonym_match() {
+        // "AI regulation" should NOT match "Insurrection Act" — only matched via "regulation" → "act"
+        let score = expanded_relevance_score("AI regulation", "Will Trump invoke the Insurrection Act during his term?");
+        assert!(score < 0.3, "Expected low score for Insurrection Act, got {}", score);
+    }
+
+    #[test]
+    fn test_expanded_keeps_good_match() {
+        // "AI regulation" SHOULD match titles with "AI" in them
+        let score = expanded_relevance_score("AI regulation", "Will the US government take control of any AI company?");
+        assert!(score > 0.3, "Expected good score for AI company, got {}", score);
     }
 }

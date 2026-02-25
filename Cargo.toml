@@ -1,6 +1,6 @@
 [package]
 name = "oddsense"
-version = "0.2.0"
+version = "0.2.1"
 edition = "2021"
 description = "Agent-native CLI for prediction market intelligence — sentiment analysis, divergence detection, and cross-platform arbitrage"
 license = "MIT"
