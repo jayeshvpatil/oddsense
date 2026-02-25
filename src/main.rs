@@ -2,7 +2,9 @@ mod adapters;
 mod analysis;
 mod cli;
 mod config;
+mod llm;
 mod output;
+mod search;
 mod sentiment;
 
 use clap::Parser;
@@ -18,9 +20,25 @@ async fn main() {
     let result = match cli.command {
         Commands::Search {
             ref query,
+            ref sources,
+            ref category,
             limit,
             ref sort,
-        } => cli::search::run(query, limit, sort, format, cli.quiet, cli.raw).await,
+        } => {
+            cli::search::run(
+                query,
+                sources,
+                category.as_deref(),
+                limit,
+                sort,
+                format,
+                cli.quiet,
+                cli.raw,
+                cli.smart,
+                config_path,
+            )
+            .await
+        }
 
         Commands::Enrich {
             ref query,

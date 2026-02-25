@@ -17,8 +17,20 @@ const NEGATIVE_WORDS: &[&str] = &[
     "resist", "reject", "decrease", "shrink", "retreat", "concern", "warning",
 ];
 
+const NEGATION_WORDS: &[&str] = &[
+    "not", "no", "never", "neither", "nobody", "nothing",
+    "nor", "nowhere", "hardly", "barely", "scarcely",
+    "doesn't", "doesnt", "don't", "dont", "didn't", "didnt",
+    "won't", "wont", "wouldn't", "wouldnt", "can't", "cant",
+    "couldn't", "couldnt", "shouldn't", "shouldnt",
+    "isn't", "isnt", "aren't", "arent", "wasn't", "wasnt",
+    "weren't", "werent", "hasn't", "hasnt", "haven't", "havent",
+    "unlikely", "fails", "unable",
+];
+
 /// Score a piece of text for sentiment.
 /// Returns a value in [-1.0, 1.0] where positive = bullish, negative = bearish.
+/// Handles negation: "not approved" counts as negative, "not rejected" as positive.
 pub fn score_text(text: &str) -> f64 {
     let lower = text.to_lowercase();
     let words: Vec<&str> = lower.split_whitespace().collect();
@@ -30,13 +42,30 @@ pub fn score_text(text: &str) -> f64 {
     let mut pos_count = 0;
     let mut neg_count = 0;
 
-    for word in &words {
+    for (i, word) in words.iter().enumerate() {
         let cleaned = word.trim_matches(|c: char| !c.is_alphanumeric());
+
+        // Check if any of the preceding 2 words is a negation
+        let negated = (1..=2).any(|offset| {
+            i >= offset && {
+                let prev = words[i - offset].trim_matches(|c: char| !c.is_alphanumeric());
+                NEGATION_WORDS.contains(&prev)
+            }
+        });
+
         if POSITIVE_WORDS.contains(&cleaned) {
-            pos_count += 1;
+            if negated {
+                neg_count += 1; // "not approved" → negative
+            } else {
+                pos_count += 1;
+            }
         }
         if NEGATIVE_WORDS.contains(&cleaned) {
-            neg_count += 1;
+            if negated {
+                pos_count += 1; // "not rejected" → positive
+            } else {
+                neg_count += 1;
+            }
         }
     }
 
@@ -95,5 +124,24 @@ mod tests {
         );
         // Title is very positive, description slightly positive — overall positive
         assert!(score > 0.0);
+    }
+
+    #[test]
+    fn test_negation_flips_positive() {
+        let score = score_text("Bill was not approved by the senate");
+        assert!(score < 0.0, "Expected negative score for 'not approved', got {}", score);
+    }
+
+    #[test]
+    fn test_negation_flips_negative() {
+        let score = score_text("The proposal hasn't failed yet");
+        assert!(score > 0.0, "Expected positive score for 'hasn't failed', got {}", score);
+    }
+
+    #[test]
+    fn test_double_negation_still_works() {
+        // "not" + "crisis" → flipped to positive
+        let score = score_text("There is not a crisis in the economy");
+        assert!(score > 0.0, "Expected positive for negated negative, got {}", score);
     }
 }

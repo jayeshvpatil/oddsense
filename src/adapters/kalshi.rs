@@ -107,13 +107,15 @@ impl MarketSource for KalshiAdapter {
 
     async fn search(&self, query: &str, limit: usize) -> Result<Vec<NormalizedMarket>> {
         let url = format!("{}/events", BASE_URL);
+        // Kalshi doesn't support text search — fetch a large batch and filter client-side
+        let fetch_limit = 200.to_string();
         let resp = self
             .client
             .get(&url)
             .query(&[
                 ("status", "open"),
                 ("with_nested_markets", "true"),
-                ("limit", &limit.to_string()),
+                ("limit", &fetch_limit),
             ])
             .send()
             .await
@@ -125,18 +127,35 @@ impl MarketSource for KalshiAdapter {
 
         let data: EventsResponse = resp.json().await.context("Failed to parse Kalshi response")?;
 
-        let query_lower = query.to_lowercase();
-        let mut markets: Vec<NormalizedMarket> = data
+        // Use expanded relevance scoring for semantic matching
+        use crate::search;
+
+        let mut scored_markets: Vec<(f64, NormalizedMarket)> = data
             .events
             .iter()
-            .filter(|e| e.title.to_lowercase().contains(&query_lower))
+            .filter(|e| search::expanded_relevance_score(query, &e.title) > 0.3)
             .flat_map(|e| {
+                let score = search::expanded_relevance_score(query, &e.title);
                 e.markets
                     .iter()
-                    .map(move |m| Self::normalize(e, m))
+                    .map(move |m| (score, Self::normalize(e, m)))
             })
+            .filter(|(_, m)| !m.is_expired())
             .collect();
 
+        // Sort by relevance score descending, then by volume
+        scored_markets.sort_by(|a, b| {
+            b.0.partial_cmp(&a.0)
+                .unwrap()
+                .then_with(|| {
+                    b.1.volume_24h
+                        .unwrap_or(0.0)
+                        .partial_cmp(&a.1.volume_24h.unwrap_or(0.0))
+                        .unwrap()
+                })
+        });
+
+        let mut markets: Vec<NormalizedMarket> = scored_markets.into_iter().map(|(_, m)| m).collect();
         markets.truncate(limit);
         Ok(markets)
     }
@@ -169,6 +188,7 @@ impl MarketSource for KalshiAdapter {
                     .iter()
                     .map(move |m| Self::normalize(e, m))
             })
+            .filter(|m| !m.is_expired())
             .collect();
 
         // Sort by volume descending

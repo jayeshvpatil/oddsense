@@ -9,12 +9,24 @@ pub struct Config {
     pub api_keys: ApiKeys,
     #[serde(default)]
     pub defaults: Defaults,
+    #[serde(default)]
+    pub llm: LlmConfig,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ApiKeys {
     pub polymarket: Option<String>,
     pub newsapi: Option<String>,
+    pub anthropic: Option<String>,
+    pub openai: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct LlmConfig {
+    /// LLM provider: "anthropic" or "openai"
+    pub provider: Option<String>,
+    /// Model override (e.g. "claude-haiku-4-5-20251001")
+    pub model: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

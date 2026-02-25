@@ -42,6 +42,10 @@ pub struct Cli {
     /// Verbose logging to stderr
     #[arg(long, short, global = true)]
     pub verbose: bool,
+
+    /// Use LLM for smart query expansion and result reranking (requires API key)
+    #[arg(long, short = 's', global = true)]
+    pub smart: bool,
 }
 
 #[derive(Subcommand, Debug)]
@@ -50,6 +54,14 @@ pub enum Commands {
     Search {
         /// Search query
         query: String,
+
+        /// Comma-separated sources: polymarket,kalshi,metaculus,all
+        #[arg(long, default_value = "all")]
+        sources: String,
+
+        /// Filter by category: politics, economics, technology, crypto, sports, science, geopolitics, culture
+        #[arg(long)]
+        category: Option<String>,
 
         /// Max results
         #[arg(long, default_value_t = 10)]

@@ -25,6 +25,27 @@ pub struct NormalizedMarket {
     pub source_data: Value,
 }
 
+impl NormalizedMarket {
+    /// Returns true if this market's end date has already passed.
+    pub fn is_expired(&self) -> bool {
+        if let Some(ref end) = self.end_date {
+            if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(end) {
+                return dt < chrono::Utc::now();
+            }
+            // Try parsing date-only formats like "2025-12-31"
+            if let Ok(date) = chrono::NaiveDate::parse_from_str(end, "%Y-%m-%d") {
+                let end_dt = date
+                    .and_hms_opt(23, 59, 59)
+                    .map(|ndt| ndt.and_utc());
+                if let Some(end_dt) = end_dt {
+                    return end_dt < chrono::Utc::now();
+                }
+            }
+        }
+        false
+    }
+}
+
 /// Wrapper for JSON output with metadata.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MarketResponse {

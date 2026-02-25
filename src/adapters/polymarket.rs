@@ -136,6 +136,7 @@ impl MarketSource for PolymarketAdapter {
             .iter()
             .filter(|r| !is_closed(r))
             .map(Self::normalize)
+            .filter(|m| !m.is_expired())
             .collect();
         markets.truncate(limit);
         Ok(markets)
@@ -157,7 +158,11 @@ impl MarketSource for PolymarketAdapter {
             .await?;
 
         // Sort by 24h volume descending on our side since the API ordering is unreliable
-        let mut markets: Vec<NormalizedMarket> = raw.iter().map(Self::normalize).collect();
+        let mut markets: Vec<NormalizedMarket> = raw
+            .iter()
+            .map(Self::normalize)
+            .filter(|m| !m.is_expired())
+            .collect();
         markets.sort_by(|a, b| {
             b.volume_24h
                 .unwrap_or(0.0)
