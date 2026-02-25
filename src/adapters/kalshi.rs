@@ -41,6 +41,7 @@ struct KalshiMarket {
     status: Option<String>,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 struct MarketsResponse {
     markets: Vec<KalshiMarket>,

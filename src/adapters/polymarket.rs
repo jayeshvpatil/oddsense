@@ -19,6 +19,7 @@ impl PolymarketAdapter {
         }
     }
 
+    #[allow(dead_code)]
     pub fn with_binary(path: String) -> Self {
         Self { binary: path }
     }

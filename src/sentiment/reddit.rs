@@ -26,7 +26,7 @@ struct RedditPost {
     subreddit: Option<String>,
     created_utc: Option<f64>,
     permalink: Option<String>,
-    score: Option<i64>,
+    _score: Option<i64>,
 }
 
 /// Fetch Reddit sentiment for a query using the public JSON API.

@@ -10,7 +10,7 @@ const NEWSAPI_BASE: &str = "https://newsapi.org/v2";
 struct NewsApiResponse {
     status: String,
     #[serde(rename = "totalResults")]
-    total_results: Option<u32>,
+    _total_results: Option<u32>,
     articles: Option<Vec<NewsArticle>>,
     message: Option<String>,
 }

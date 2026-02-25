@@ -9,6 +9,7 @@ use schema::NormalizedMarket;
 
 /// Trait that all prediction market source adapters implement.
 #[async_trait]
+#[allow(dead_code)]
 pub trait MarketSource: Send + Sync {
     fn name(&self) -> &str;
     async fn search(&self, query: &str, limit: usize) -> Result<Vec<NormalizedMarket>>;
