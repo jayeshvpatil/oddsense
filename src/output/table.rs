@@ -243,10 +243,11 @@ pub fn render_table<T: TableRenderable>(data: &T) -> Result<()> {
 // --- Helpers ---
 
 fn truncate(s: &str, max: usize) -> String {
-    if s.len() <= max {
+    if s.chars().count() <= max {
         s.to_string()
     } else {
-        format!("{}...", &s[..max - 3])
+        let truncated: String = s.chars().take(max - 3).collect();
+        format!("{}...", truncated)
     }
 }
 
