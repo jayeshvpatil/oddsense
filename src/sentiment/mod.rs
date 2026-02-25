@@ -25,6 +25,81 @@ pub struct SignalItem {
     pub url: Option<String>,
 }
 
+/// Re-score existing sentiment signals for a specific market title.
+/// Instead of calling APIs again, we filter/weight the already-fetched signals
+/// by relevance to the market title, giving each market a distinct score.
+pub fn rescore_for_market(base: &SentimentResult, market_title: &str) -> SentimentResult {
+    let title_words: Vec<String> = extract_keywords(market_title);
+
+    if title_words.is_empty() || base.sample_signals.is_empty() {
+        return base.clone();
+    }
+
+    // Score each signal by keyword overlap with the market title
+    let mut weighted_sum = 0.0;
+    let mut weight_total = 0.0;
+
+    for signal in &base.sample_signals {
+        let signal_text = signal.title.to_lowercase();
+        let overlap = title_words
+            .iter()
+            .filter(|w| signal_text.contains(w.as_str()))
+            .count();
+
+        // Weight: base relevance (0.1) + keyword overlap bonus
+        let relevance = 0.1 + (overlap as f64 * 0.3);
+        weighted_sum += signal.sentiment * relevance;
+        weight_total += relevance;
+    }
+
+    let score = if weight_total > 0.0 {
+        (weighted_sum / weight_total).clamp(-1.0, 1.0)
+    } else {
+        base.score
+    };
+
+    // Confidence scales with how many signals were relevant
+    let relevant_count = base
+        .sample_signals
+        .iter()
+        .filter(|s| {
+            let st = s.title.to_lowercase();
+            title_words.iter().any(|w| st.contains(w.as_str()))
+        })
+        .count();
+    let confidence = if relevant_count > 0 {
+        (relevant_count as f64 / 10.0).min(1.0) * base.confidence
+    } else {
+        base.confidence * 0.5 // low confidence if no direct matches
+    };
+
+    SentimentResult {
+        query: market_title.to_string(),
+        source: base.source.clone(),
+        score,
+        confidence,
+        signal_count: base.signal_count,
+        sample_signals: base.sample_signals.clone(),
+        analyzed_at: base.analyzed_at.clone(),
+    }
+}
+
+/// Extract meaningful keywords from a market title (skip stop words).
+fn extract_keywords(title: &str) -> Vec<String> {
+    const STOP_WORDS: &[&str] = &[
+        "will", "the", "a", "an", "in", "of", "at", "to", "for", "by", "on", "is", "be",
+        "and", "or", "not", "than", "as", "this", "that", "with", "from", "its", "it",
+        "more", "less", "before", "after", "during", "next", "new", "win", "have", "has",
+        "does", "do", "been", "was", "were", "are", "about",
+    ];
+    title
+        .to_lowercase()
+        .split(|c: char| !c.is_alphanumeric())
+        .filter(|w| w.len() > 2 && !STOP_WORDS.contains(w))
+        .map(String::from)
+        .collect()
+}
+
 /// Aggregate sentiment from multiple sources.
 pub async fn aggregate_sentiment(
     query: &str,

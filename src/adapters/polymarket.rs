@@ -84,6 +84,19 @@ impl PolymarketAdapter {
     }
 }
 
+/// Check if a raw polymarket market is closed/resolved (should be filtered out of search).
+fn is_closed(raw: &Value) -> bool {
+    // "closed" field is a boolean
+    if raw["closed"].as_bool() == Some(true) {
+        return true;
+    }
+    // "active" field — if explicitly false, skip it
+    if raw["active"].as_bool() == Some(false) {
+        return true;
+    }
+    false
+}
+
 /// Parse the "Yes" outcome probability from polymarket's outcomePrices field.
 /// Format: "[\"0.85\",\"0.15\"]" — index 0 is the Yes price (0.0 to 1.0).
 fn parse_probability(raw: &Value) -> f64 {
@@ -114,11 +127,16 @@ impl MarketSource for PolymarketAdapter {
     }
 
     async fn search(&self, query: &str, limit: usize) -> Result<Vec<NormalizedMarket>> {
-        let limit_str = limit.to_string();
+        // Fetch extra since we'll filter out closed/resolved markets
+        let fetch_limit = (limit * 3).to_string();
         let raw = self
-            .run_cli(&["markets", "search", query, "--limit", &limit_str])
+            .run_cli(&["markets", "search", query, "--limit", &fetch_limit])
             .await?;
-        let mut markets: Vec<NormalizedMarket> = raw.iter().map(Self::normalize).collect();
+        let mut markets: Vec<NormalizedMarket> = raw
+            .iter()
+            .filter(|r| !is_closed(r))
+            .map(Self::normalize)
+            .collect();
         markets.truncate(limit);
         Ok(markets)
     }
