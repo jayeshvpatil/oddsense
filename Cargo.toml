@@ -1,18 +1,18 @@
 [package]
-name = "vibe-dash"
-version = "0.1.2"
+name = "oddsense"
+version = "0.1.0"
 edition = "2021"
 description = "Agent-native CLI for prediction market intelligence — sentiment analysis, divergence detection, and cross-platform arbitrage"
 license = "MIT"
-repository = "https://github.com/jayeshvpatil/vibe-dash"
-homepage = "https://github.com/jayeshvpatil/vibe-dash"
+repository = "https://github.com/jayeshvpatil/oddsense"
+homepage = "https://github.com/jayeshvpatil/oddsense"
 readme = "README.md"
 keywords = ["prediction-markets", "polymarket", "kalshi", "sentiment", "cli"]
 categories = ["command-line-utilities", "finance"]
 authors = ["Jayesh Patil"]
 
 [[bin]]
-name = "vibe-dash"
+name = "oddsense"
 path = "src/main.rs"
 
 [dependencies]

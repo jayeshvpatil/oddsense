@@ -52,7 +52,7 @@ struct MarketsResponse {
 impl KalshiAdapter {
     pub fn new() -> Self {
         let client = reqwest::Client::builder()
-            .user_agent("vibe-dash/0.1.0")
+            .user_agent("oddsense/0.1.0")
             .build()
             .expect("Failed to build HTTP client");
         Self { client }

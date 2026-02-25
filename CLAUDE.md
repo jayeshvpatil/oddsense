@@ -1,16 +1,16 @@
-# CLAUDE.md — vibe-dash
+# CLAUDE.md — oddsense
 
 ## Project Overview
 
-**vibe-dash** is an agent-native CLI intelligence layer for prediction markets. It does NOT re-implement market data fetching. Instead, it **composes with existing CLIs** (starting with [polymarket-cli](https://github.com/Polymarket/polymarket-cli)) and adds the intelligence layer on top: cross-platform aggregation, real-world sentiment analysis, divergence detection, and arbitrage discovery.
+**oddsense** is an agent-native CLI intelligence layer for prediction markets. It does NOT re-implement market data fetching. Instead, it **composes with existing CLIs** (starting with [polymarket-cli](https://github.com/Polymarket/polymarket-cli)) and adds the intelligence layer on top: cross-platform aggregation, real-world sentiment analysis, divergence detection, and arbitrage discovery.
 
-Think of it as: `polymarket-cli` is the data pipe. `vibe-dash` is the brain.
+Think of it as: `polymarket-cli` is the data pipe. `oddsense` is the brain.
 
 ### Core Philosophy (from Karpathy)
 
 > "CLIs are super exciting precisely because they are a 'legacy' technology, which means AI agents can natively and easily use them, combine them... Even more powerful when you use it as a module of bigger pipelines."
 
-vibe-dash embodies this. It's a CLI that agents can install, compose, and build dashboards/apps on top of. It treats polymarket-cli (and future CLIs like kalshi, metaculus) as upstream data sources and focuses exclusively on what they don't provide: **analysis, enrichment, signals, and cross-source intelligence.**
+oddsense embodies this. It's a CLI that agents can install, compose, and build dashboards/apps on top of. It treats polymarket-cli (and future CLIs like kalshi, metaculus) as upstream data sources and focuses exclusively on what they don't provide: **analysis, enrichment, signals, and cross-source intelligence.**
 
 ---
 
@@ -32,7 +32,7 @@ vibe-dash embodies this. It's a CLI that agents can install, compose, and build 
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│                      vibe-dash                          │
+│                      oddsense                          │
 │                  (intelligence layer)                    │
 │                                                         │
 │  ┌──────────┐  ┌────────────┐  ┌─────────────────────┐ │
@@ -56,14 +56,14 @@ vibe-dash embodies this. It's a CLI that agents can install, compose, and build 
    (subprocess)      (direct HTTP)      (direct HTTP)
 ```
 
-**Key design decision**: For Polymarket, we shell out to `polymarket-cli` and parse its JSON output. This avoids reimplementing their auth, CLOB interaction, and API wrappers. For other platforms without existing CLIs, we call their APIs directly. This means users get the full power of polymarket-cli for trading/browsing and vibe-dash for intelligence.
+**Key design decision**: For Polymarket, we shell out to `polymarket-cli` and parse its JSON output. This avoids reimplementing their auth, CLOB interaction, and API wrappers. For other platforms without existing CLIs, we call their APIs directly. This means users get the full power of polymarket-cli for trading/browsing and oddsense for intelligence.
 
 ---
 
 ## Project Structure
 
 ```
-vibe-dash/
+oddsense/
 ├── CLAUDE.md                # This file — build instructions for Claude Code
 ├── SKILL.md                 # Instructions for OTHER agents consuming this CLI
 ├── README.md                # Human-facing docs
@@ -130,7 +130,7 @@ vibe-dash/
 
 **Goal**: Shell out to `polymarket-cli`, parse JSON output, normalize into unified schema.
 
-1. Initialize Rust project: `cargo init --name vibe-dash`
+1. Initialize Rust project: `cargo init --name oddsense`
 2. Add dependencies to `Cargo.toml`:
    ```toml
    [dependencies]
@@ -191,10 +191,10 @@ vibe-dash/
    - **Important**: Polymarket prices are in cents (0-100), normalize to 0.0-1.0
 6. Create basic CLI skeleton with a `search` passthrough command to verify the pipeline works:
    ```
-   vibe-dash search "bitcoin" --limit 5 --format json
+   oddsense search "bitcoin" --limit 5 --format json
    ```
 
-**Milestone**: `vibe-dash search "bitcoin"` calls polymarket-cli under the hood and returns normalized data.
+**Milestone**: `oddsense search "bitcoin"` calls polymarket-cli under the hood and returns normalized data.
 
 **Testing**: Save a real `polymarket -o json markets search "bitcoin"` output to `tests/fixtures/polymarket_cli_output.json`. Write unit tests that parse this fixture through the adapter.
 
@@ -250,12 +250,12 @@ vibe-dash/
    - Return both individual and aggregate `SentimentResult`s
 6. Add `enrich` command in `cli/enrich.rs`:
    ```
-   vibe-dash enrich "bitcoin" --sources news,reddit --format json
+   oddsense enrich "bitcoin" --sources news,reddit --format json
    ```
    - Takes a topic, fetches sentiment from all sources, returns enriched data
-   - Can also accept piped input: `polymarket -o json markets search "bitcoin" | vibe-dash enrich --stdin`
+   - Can also accept piped input: `polymarket -o json markets search "bitcoin" | oddsense enrich --stdin`
 
-**Milestone**: `vibe-dash enrich "AI regulation"` returns sentiment scores from news and reddit.
+**Milestone**: `oddsense enrich "AI regulation"` returns sentiment scores from news and reddit.
 
 **Testing**: Mock HTTP responses for NewsAPI and Reddit. Test scorer with known positive/negative headlines.
 
@@ -310,7 +310,7 @@ vibe-dash/
    ```
 3. Implement `cli/divergence.rs` command:
    ```
-   vibe-dash divergence <query>
+   oddsense divergence <query>
      --sources polymarket,news,reddit
      --min-score 20
      --limit 10
@@ -331,7 +331,7 @@ vibe-dash/
     This could mean the market is underpricing the event relative to current news flow."
    ```
 
-**Milestone**: `vibe-dash divergence "bitcoin" --min-score 30` returns markets where odds significantly diverge from real-world sentiment.
+**Milestone**: `oddsense divergence "bitcoin" --min-score 30` returns markets where odds significantly diverge from real-world sentiment.
 
 **Testing**: Create fixture data with known divergences. Test that scoring algorithm produces expected results for edge cases (0 probability, neutral sentiment, max divergence, etc.)
 
@@ -373,22 +373,22 @@ vibe-dash/
    - Only surface opportunities where spread > threshold (default 5%)
 4. Implement `cli/arbitrage.rs` command:
    ```
-   vibe-dash arbitrage
+   oddsense arbitrage
      --sources polymarket,kalshi,metaculus
      --min-spread 5
      --limit 20
      --format json|table
    ```
-   - Optionally take a topic: `vibe-dash arbitrage "AI" --min-spread 10`
+   - Optionally take a topic: `oddsense arbitrage "AI" --min-spread 10`
 5. Implement `cli/compare.rs` for explicit side-by-side:
    ```
-   vibe-dash compare "Will GPT-5 release in 2026"
+   oddsense compare "Will GPT-5 release in 2026"
      --sources polymarket,kalshi,metaculus
      --format json|table
    ```
    - Shows the same (or similar) question across all platforms with odds, volume, and end dates
 
-**Milestone**: `vibe-dash arbitrage --min-spread 10` finds questions priced >10% differently across platforms.
+**Milestone**: `oddsense arbitrage --min-spread 10` finds questions priced >10% differently across platforms.
 
 **Testing**: Create fixtures with intentionally similar/different market titles. Test fuzzy matching accuracy. Test spread calculations.
 
@@ -406,7 +406,7 @@ vibe-dash/
 2. Implement `output/tui.rs` with four panels:
    ```
    ┌─────────────────────────────────────────────────────────┐
-   │  VIBE-DASH — Prediction Market Intelligence    [q]quit  │
+   │  ODDSENSE — Prediction Market Intelligence    [q]quit  │
    ├──────────────────────────────┬──────────────────────────┤
    │  🔥 TOP DIVERGENCES          │  📊 ARBITRAGE SPREADS    │
    │                              │                          │
@@ -444,14 +444,14 @@ vibe-dash/
    - Cache data between refreshes, show stale indicator if fetch fails
 5. Launch command:
    ```
-   vibe-dash dashboard
+   oddsense dashboard
      --refresh 60
      --sources polymarket,kalshi
      --sentiment news,reddit
      --panels divergence,arbitrage,momentum,watchlist
    ```
 
-**Milestone**: `vibe-dash dashboard` launches a live-updating multi-panel TUI.
+**Milestone**: `oddsense dashboard` launches a live-updating multi-panel TUI.
 
 ---
 
@@ -489,16 +489,16 @@ vibe-dash/
    ```
 3. Implement `cli/signals.rs` command:
    ```
-   vibe-dash signals
+   oddsense signals
      --timeframe 24h|7d
      --min-volume 10000
      --format json|table
 
-   vibe-dash signals --correlated
+   oddsense signals --correlated
      # Shows correlated market clusters
    ```
 
-**Milestone**: `vibe-dash signals` surfaces high-momentum markets with volume context and correlation clusters.
+**Milestone**: `oddsense signals` surfaces high-momentum markets with volume context and correlation clusters.
 
 ---
 
@@ -507,7 +507,7 @@ vibe-dash/
 **Goal**: Persistent config, caching, and full agent-readiness.
 
 1. Implement `config.rs`:
-   - Config at `~/.config/vibe-dash/config.toml`:
+   - Config at `~/.config/oddsense/config.toml`:
      ```toml
      [api_keys]
      newsapi = "your-key-here"
@@ -532,7 +532,7 @@ vibe-dash/
      path = "polymarket"        # custom path to polymarket binary if not in PATH
      ```
 2. Implement basic file-based caching:
-   - Cache dir: `~/.cache/vibe-dash/`
+   - Cache dir: `~/.cache/oddsense/`
    - Cache key: `{source}_{query}_{timestamp_bucket}.json`
    - TTL-based invalidation
    - `--no-cache` flag to bypass
@@ -560,7 +560,7 @@ vibe-dash/
 
 ## CLI Command Reference
 
-### `vibe-dash enrich <query>`
+### `oddsense enrich <query>`
 Fetch sentiment signals for a topic. The foundational command everything else builds on.
 ```
 FLAGS:
@@ -572,13 +572,13 @@ FLAGS:
 **Example**:
 ```bash
 # Standalone
-vibe-dash enrich "bitcoin ETF"
+oddsense enrich "bitcoin ETF"
 
 # Piped from polymarket-cli
-polymarket -o json markets search "bitcoin" | vibe-dash enrich --stdin
+polymarket -o json markets search "bitcoin" | oddsense enrich --stdin
 ```
 
-### `vibe-dash divergence <query>`
+### `oddsense divergence <query>`
 Find markets where odds diverge from real-world sentiment. The killer feature.
 ```
 FLAGS:
@@ -591,10 +591,10 @@ FLAGS:
 ```
 **Example**:
 ```bash
-vibe-dash divergence "AI" --min-score 40 --explain --format json
+oddsense divergence "AI" --min-score 40 --explain --format json
 ```
 
-### `vibe-dash arbitrage [query]`
+### `oddsense arbitrage [query]`
 Find the same question priced differently across platforms.
 ```
 FLAGS:
@@ -605,11 +605,11 @@ FLAGS:
 ```
 **Example**:
 ```bash
-vibe-dash arbitrage --min-spread 10 --format json
-vibe-dash arbitrage "election" --sources polymarket,kalshi
+oddsense arbitrage --min-spread 10 --format json
+oddsense arbitrage "election" --sources polymarket,kalshi
 ```
 
-### `vibe-dash compare <query>`
+### `oddsense compare <query>`
 Side-by-side comparison of how different platforms price the same topic.
 ```
 FLAGS:
@@ -618,10 +618,10 @@ FLAGS:
 ```
 **Example**:
 ```bash
-vibe-dash compare "Will GPT-5 launch in 2026"
+oddsense compare "Will GPT-5 launch in 2026"
 ```
 
-### `vibe-dash signals`
+### `oddsense signals`
 Surface trending markets, momentum shifts, and correlated clusters.
 ```
 FLAGS:
@@ -633,11 +633,11 @@ FLAGS:
 ```
 **Example**:
 ```bash
-vibe-dash signals --timeframe 24h --min-volume 100000
-vibe-dash signals --correlated --format json
+oddsense signals --timeframe 24h --min-volume 100000
+oddsense signals --correlated --format json
 ```
 
-### `vibe-dash dashboard`
+### `oddsense dashboard`
 Launch live TUI dashboard with all intelligence panels.
 ```
 FLAGS:
@@ -648,7 +648,7 @@ FLAGS:
 ```
 **Example**:
 ```bash
-vibe-dash dashboard --refresh 30 --panels divergence,momentum
+oddsense dashboard --refresh 30 --panels divergence,momentum
 ```
 
 ### Global Flags (all commands)
@@ -753,7 +753,7 @@ polymarket.slug           → used for URL construction
 ### Reddit (Phase 2)
 - `GET https://www.reddit.com/search.json?q=<query>&sort=new&limit=25`
 - No API key needed for public JSON endpoints
-- Set User-Agent header to avoid 429s: `User-Agent: vibe-dash/0.1.0`
+- Set User-Agent header to avoid 429s: `User-Agent: oddsense/0.1.0`
 - Returns: data.children[].data.{title, selftext, score, num_comments, created_utc}
 
 ---
@@ -779,31 +779,31 @@ These demonstrate Karpathy's "module of bigger pipelines" vision:
 
 ```bash
 # Agent builds a divergence report
-vibe-dash divergence "AI" --format json --explain | jq '.[] | select(.signal_strength == "strong")'
+oddsense divergence "AI" --format json --explain | jq '.[] | select(.signal_strength == "strong")'
 
 # Cross-reference with GitHub activity
 gh search repos "AI agent" --sort stars --json name,stars | \
   jq -r '.[].name' | head -5 | \
-  xargs -I {} vibe-dash enrich "{}" --format json
+  xargs -I {} oddsense enrich "{}" --format json
 
 # Daily alpha email pipeline
 echo "# Daily Vibe Report — $(date)" > /tmp/report.md
 echo "## Strong Divergences" >> /tmp/report.md
-vibe-dash divergence "" --min-score 50 --format table >> /tmp/report.md
+oddsense divergence "" --min-score 50 --format table >> /tmp/report.md
 echo "## Arbitrage Opportunities" >> /tmp/report.md
-vibe-dash arbitrage --min-spread 8 --format table >> /tmp/report.md
+oddsense arbitrage --min-spread 8 --format table >> /tmp/report.md
 echo "## Momentum" >> /tmp/report.md
-vibe-dash signals --timeframe 24h --format table >> /tmp/report.md
+oddsense signals --timeframe 24h --format table >> /tmp/report.md
 cat /tmp/report.md | mail -s "Vibe Report" user@example.com
 
 # Agent creates a web dashboard from CLI data
-vibe-dash divergence "" --min-score 30 --format json > divergences.json
-vibe-dash signals --format json > signals.json
+oddsense divergence "" --min-score 30 --format json > divergences.json
+oddsense signals --format json > signals.json
 # → agent reads these and builds a React dashboard
 
-# Combine polymarket-cli trading with vibe-dash intelligence
+# Combine polymarket-cli trading with oddsense intelligence
 # "Buy the strongest divergence where sentiment says underpriced"
-MARKET=$(vibe-dash divergence "" --format json --limit 1 | jq -r '.[0].market.id')
+MARKET=$(oddsense divergence "" --format json --limit 1 | jq -r '.[0].market.id')
 polymarket clob market-order --token $MARKET --side buy --amount 5
 ```
 
@@ -811,10 +811,10 @@ polymarket clob market-order --token $MARKET --side buy --amount 5
 
 ## Definition of Done (v0.1.0)
 
-- [ ] `vibe-dash enrich <query>` returns sentiment scores from news + reddit
-- [ ] `vibe-dash divergence <query>` compares polymarket odds vs sentiment
-- [ ] `vibe-dash signals` shows momentum and volume-weighted market movers
-- [ ] `vibe-dash dashboard` launches a basic TUI with divergence + signals panels
+- [ ] `oddsense enrich <query>` returns sentiment scores from news + reddit
+- [ ] `oddsense divergence <query>` compares polymarket odds vs sentiment
+- [ ] `oddsense signals` shows momentum and volume-weighted market movers
+- [ ] `oddsense dashboard` launches a basic TUI with divergence + signals panels
 - [ ] Polymarket adapter works via polymarket-cli subprocess with proper error handling
 - [ ] All commands support `--format json` with documented schemas
 - [ ] All commands support `--stdin` for piped composition
@@ -829,8 +829,8 @@ polymarket clob market-order --token $MARKET --side buy --amount 5
 
 - [ ] Kalshi adapter (direct API)
 - [ ] Metaculus adapter (direct API)
-- [ ] `vibe-dash arbitrage` cross-platform spread detection
-- [ ] `vibe-dash compare` side-by-side platform comparison
+- [ ] `oddsense arbitrage` cross-platform spread detection
+- [ ] `oddsense compare` side-by-side platform comparison
 - [ ] Fuzzy matching for cross-platform question pairing
 - [ ] Correlation cluster detection in signals
 - [ ] Full TUI dashboard with all 4 panels

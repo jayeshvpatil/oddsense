@@ -1,21 +1,21 @@
-# SKILL.md — vibe-dash
+# SKILL.md — oddsense
 
-> Instructions for AI agents to use vibe-dash CLI.
+> Instructions for AI agents to use oddsense CLI.
 
-## What is vibe-dash?
+## What is oddsense?
 
 A CLI tool for prediction market intelligence. It aggregates data from Polymarket, Kalshi, and Metaculus, cross-references with news/Reddit sentiment, and detects divergences and arbitrage opportunities.
 
 ## Installation
 
 ```bash
-cargo install vibe-dash
+cargo install oddsense
 cargo install --git https://github.com/Polymarket/polymarket-cli.git
 ```
 
 ## Commands
 
-### `vibe-dash search <query>`
+### `oddsense search <query>`
 Search prediction markets for a topic.
 ```
 --limit <n>       Max results (default: 10)
@@ -50,7 +50,7 @@ Search prediction markets for a topic.
 }
 ```
 
-### `vibe-dash enrich <query>`
+### `oddsense enrich <query>`
 Fetch sentiment signals for a topic from news and Reddit.
 ```
 --sources <s>     news, reddit, all (default: all)
@@ -82,7 +82,7 @@ Fetch sentiment signals for a topic from news and Reddit.
 - `score`: -1.0 (bearish) to 1.0 (bullish)
 - `confidence`: 0.0 to 1.0
 
-### `vibe-dash divergence <query>`
+### `oddsense divergence <query>`
 Find markets where odds diverge from real-world sentiment.
 ```
 --sentiment <s>   news, reddit, all (default: all)
@@ -115,7 +115,7 @@ Find markets where odds diverge from real-world sentiment.
 - `direction`: "MarketHigher" or "SentimentHigher"
 - `signal_strength`: "weak" (<25), "moderate" (25-50), "strong" (>50)
 
-### `vibe-dash signals`
+### `oddsense signals`
 Surface trending markets by volume.
 ```
 --timeframe <t>   1h, 24h, 7d (default: 24h)
@@ -126,7 +126,7 @@ Surface trending markets by volume.
 --raw
 ```
 
-### `vibe-dash arbitrage [query]`
+### `oddsense arbitrage [query]`
 Find cross-platform arbitrage opportunities.
 ```
 --sources <s>     polymarket,kalshi,metaculus,all (default: all)
@@ -161,7 +161,7 @@ Find cross-platform arbitrage opportunities.
 }
 ```
 
-### `vibe-dash compare <query>`
+### `oddsense compare <query>`
 Compare the same question across platforms side-by-side.
 ```
 --sources <s>     polymarket,kalshi,metaculus,all (default: all)
@@ -187,25 +187,25 @@ Compare the same question across platforms side-by-side.
 
 ```bash
 # Find high-confidence divergences
-vibe-dash divergence "AI" -q --raw --format json | jq '.divergences[] | select(.divergence_score > 50)'
+oddsense divergence "AI" -q --raw --format json | jq '.divergences[] | select(.divergence_score > 50)'
 
 # Get arbitrage spreads > 10pp
-vibe-dash arbitrage --min-spread 10 -q --raw --format json | jq '.opportunities[].summary'
+oddsense arbitrage --min-spread 10 -q --raw --format json | jq '.opportunities[].summary'
 
 # Daily market scan
 for topic in "AI" "crypto" "elections"; do
   echo "=== $topic ==="
-  vibe-dash divergence "$topic" --format json -q --raw
+  oddsense divergence "$topic" --format json -q --raw
 done
 
 # Combine search + sentiment
 QUERY="bitcoin"
-vibe-dash search "$QUERY" --format json -q --raw > /tmp/markets.json
-vibe-dash enrich "$QUERY" --format json -q --raw > /tmp/sentiment.json
+oddsense search "$QUERY" --format json -q --raw > /tmp/markets.json
+oddsense enrich "$QUERY" --format json -q --raw > /tmp/sentiment.json
 jq -s '{ markets: .[0], sentiment: .[1] }' /tmp/markets.json /tmp/sentiment.json
 
 # Cross-platform comparison piped to analysis
-vibe-dash arbitrage --format json -q --raw | \
+oddsense arbitrage --format json -q --raw | \
   jq '.opportunities[] | {topic, spread, buy: .lowest.source, sell: .highest.source}'
 ```
 

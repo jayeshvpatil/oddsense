@@ -32,7 +32,7 @@ struct RedditPost {
 /// Fetch Reddit sentiment for a query using the public JSON API.
 pub async fn fetch_reddit_sentiment(query: &str) -> Result<SentimentResult> {
     let client = Client::builder()
-        .user_agent("vibe-dash/0.1.0 (prediction market intelligence)")
+        .user_agent("oddsense/0.1.0 (prediction market intelligence)")
         .build()?;
 
     let resp = client

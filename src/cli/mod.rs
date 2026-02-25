@@ -9,7 +9,7 @@ use clap::{Parser, Subcommand};
 
 #[derive(Parser, Debug)]
 #[command(
-    name = "vibe-dash",
+    name = "oddsense",
     version,
     about = "Prediction market intelligence — sentiment, divergences, and signals",
     long_about = "Agent-native CLI that composes with polymarket-cli to add sentiment analysis, \

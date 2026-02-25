@@ -39,12 +39,12 @@ pub async fn fetch_news_sentiment(
         Some(k) if !k.is_empty() => k,
         _ => bail!(
             "NewsAPI key required. Get a free key at https://newsapi.org \
-             and set it in ~/.config/vibe-dash/config.toml under [api_keys] newsapi = \"...\""
+             and set it in ~/.config/oddsense/config.toml under [api_keys] newsapi = \"...\""
         ),
     };
 
     let client = Client::builder()
-        .user_agent("vibe-dash/0.1.0")
+        .user_agent("oddsense/0.1.0")
         .build()?;
 
     let resp = client

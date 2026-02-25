@@ -34,9 +34,9 @@ impl Default for Defaults {
     }
 }
 
-/// Get the config file path (~/.config/vibe-dash/config.toml).
+/// Get the config file path (~/.config/oddsense/config.toml).
 pub fn config_path() -> Option<PathBuf> {
-    ProjectDirs::from("com", "vibe-dash", "vibe-dash")
+    ProjectDirs::from("com", "oddsense", "oddsense")
         .map(|dirs| dirs.config_dir().join("config.toml"))
 }
 
