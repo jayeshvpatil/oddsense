@@ -20,7 +20,7 @@ struct MetaculusResponse {
     results: Vec<MetaculusQuestion>,
 }
 
-#[derive(Debug, Deserialize, serde::Serialize)]
+#[derive(Debug, Deserialize)]
 struct MetaculusQuestion {
     id: i64,
     title: String,
@@ -34,12 +34,12 @@ struct MetaculusQuestion {
     group: Option<String>,
 }
 
-#[derive(Debug, Deserialize, serde::Serialize)]
+#[derive(Debug, Deserialize)]
 struct CommunityPrediction {
     full: Option<PredictionValue>,
 }
 
-#[derive(Debug, Deserialize, serde::Serialize)]
+#[derive(Debug, Deserialize)]
 struct PredictionValue {
     q2: Option<f64>, // median prediction
 }
@@ -76,7 +76,7 @@ impl MetaculusAdapter {
                 .url
                 .clone()
                 .unwrap_or_else(|| format!("https://www.metaculus.com/questions/{}/", q.id)),
-            source_data: serde_json::to_value(q).unwrap_or(Value::Null),
+            source_data: Value::Null,
         }
     }
 

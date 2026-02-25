@@ -27,7 +27,7 @@ pub async fn run(
     }
 
     let source_list: Vec<&str> = sources.split(',').map(|s| s.trim()).collect();
-    let fetch_limit = limit * 3; // fetch more to increase matching chances
+    let fetch_limit = (limit * 5).max(100); // fetch more to increase matching chances
     let mut all_markets: Vec<NormalizedMarket> = Vec::new();
 
     // Fetch from each source in parallel

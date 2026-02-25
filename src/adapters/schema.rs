@@ -1,6 +1,10 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+fn is_null_or_empty(v: &Value) -> bool {
+    v.is_null() || (v.is_object() && v.as_object().map_or(false, |o| o.is_empty()))
+}
+
 /// Normalized market data across all prediction market sources.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NormalizedMarket {
@@ -16,6 +20,8 @@ pub struct NormalizedMarket {
     pub category: Option<String>,
     pub url: String,
     /// Raw JSON from the source, preserved for passthrough.
+    /// Skipped in JSON output when empty/null to reduce bloat.
+    #[serde(skip_serializing_if = "is_null_or_empty")]
     pub source_data: Value,
 }
 

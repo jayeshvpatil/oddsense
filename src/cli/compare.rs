@@ -106,9 +106,17 @@ pub async fn run(
     });
     relevant.truncate(limit);
 
+    // Recompute sources based on what actually made it through the filter
+    let actual_sources: Vec<String> = {
+        let mut s: Vec<String> = relevant.iter().map(|m| m.source.clone()).collect();
+        s.sort();
+        s.dedup();
+        s
+    };
+
     let response = CompareResponse {
         query: query.to_string(),
-        sources: used_sources,
+        sources: actual_sources,
         markets: relevant,
     };
 

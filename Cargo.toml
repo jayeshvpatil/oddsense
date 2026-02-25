@@ -1,6 +1,6 @@
 [package]
 name = "vibe-dash"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 description = "Agent-native CLI for prediction market intelligence — sentiment analysis, divergence detection, and cross-platform arbitrage"
 license = "MIT"

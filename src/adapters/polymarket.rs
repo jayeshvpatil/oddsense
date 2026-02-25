@@ -79,7 +79,7 @@ impl PolymarketAdapter {
             end_date: raw["endDate"].as_str().map(String::from),
             category: raw["category"].as_str().map(String::from),
             url: format!("https://polymarket.com/event/{}", slug),
-            source_data: raw.clone(),
+            source_data: Value::Null,
         }
     }
 }

@@ -96,7 +96,6 @@ pub fn compute_divergence(market: &NormalizedMarket, sentiment: &SentimentResult
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::sentiment::SignalItem;
 
     fn make_market(prob: f64) -> NormalizedMarket {
         NormalizedMarket {

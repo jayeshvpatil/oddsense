@@ -127,23 +127,72 @@ See [SKILL.md](SKILL.md) for full agent instructions.
 
 ## Architecture
 
-vibe-dash follows a **composition over reimplementation** pattern:
-
-- **Polymarket**: Shells out to `polymarket-cli` (subprocess), parses JSON output
-- **Kalshi**: Direct REST API client (`https://api.elections.kalshi.com/trade-api/v2`)
-- **Metaculus**: Direct REST API client (requires auth)
-- **Sentiment**: NewsAPI + Reddit public API with keyword-based scoring
-- **Arbitrage**: Jaro-Winkler fuzzy title matching across platforms
+vibe-dash follows a **composition over reimplementation** pattern. For Polymarket, we shell out to `polymarket-cli` and parse its JSON output — no need to reimplement auth, CLOB interaction, or API wrappers. For platforms without existing CLIs (Kalshi, Metaculus), we call their APIs directly.
 
 ```
-vibe-dash
-  |- adapters/        # Market source adapters (polymarket, kalshi, metaculus)
-  |- analysis/        # Divergence detection, arbitrage matching
-  |- sentiment/       # News + Reddit sentiment scoring
-  |- cli/             # Command handlers
-  |- output/          # JSON + table formatters
-  '- config.rs        # Config file management
+┌─────────────────────────────────────────────────────────┐
+│                      vibe-dash                          │
+│                  (intelligence layer)                   │
+│                                                         │
+│  ┌──────────┐  ┌────────────┐  ┌─────────────────────┐  │
+│  │ Sentiment│  │ Divergence │  │   Cross-Platform    │  │
+│  │ Engine   │  │ Detector   │  │   Arbitrage Finder  │  │
+│  └────┬─────┘  └─────┬──────┘  └──────────┬──────────┘  │
+│       │              │                     │             │
+│  ┌────┴──────────────┴─────────────────────┴──────────┐  │
+│  │              Unified Market Schema                 │  │
+│  │         (normalize all sources into one)           │  │
+│  └────┬──────────────┬─────────────────────┬──────────┘  │
+│       │              │                     │             │
+│  ┌────┴────┐   ┌─────┴─────┐   ┌──────────┴──────────┐  │
+│  │Polymarket│  │  Kalshi   │   │   Metaculus         │  │
+│  │ Adapter  │  │  Adapter  │   │   Adapter           │  │
+│  │(via CLI) │  │ (via API) │   │   (via API)         │  │
+│  └──────────┘  └───────────┘   └─────────────────────┘  │
+└─────────────────────────────────────────────────────────┘
+        │               │                    │
+   polymarket-cli    Kalshi API         Metaculus API
+   (subprocess)      (direct HTTP)      (direct HTTP)
 ```
+
+### Source Adapters
+
+| Adapter | Method | Auth |
+|---|---|---|
+| **Polymarket** | Shells out to `polymarket-cli` subprocess, parses JSON | None (public) |
+| **Kalshi** | Direct REST API (`api.elections.kalshi.com`) | None (read-only) |
+| **Metaculus** | Direct REST API (`metaculus.com/api2`) | Required (skipped if unavailable) |
+| **Sentiment** | NewsAPI + Reddit public JSON API | NewsAPI key (optional) |
+| **Arbitrage** | Jaro-Winkler fuzzy title matching across all sources | N/A |
+
+### Project Structure
+
+```
+src/
+  adapters/        # Market source adapters (polymarket, kalshi, metaculus)
+  analysis/        # Divergence detection, arbitrage matching
+  sentiment/       # News + Reddit sentiment scoring
+  cli/             # Command handlers
+  output/          # JSON + table formatters
+  config.rs        # Config file management
+```
+
+## Use Cases
+
+**Developers / Builders**
+- *"Build me a dashboard showing all AI-related markets above $1M volume"* — an agent builds it in minutes using `vibe-dash search` + `signals`
+- *"Monitor these 5 markets and Slack me when odds shift more than 10%"* — an agent writes the script with `vibe-dash` in a cron loop
+
+**Researchers / Analysts**
+- *"Pull all election markets, cross-reference with polling data, show me where they diverge"* — `vibe-dash divergence` does exactly this
+- *"Give me a weekly report of the biggest movers in crypto prediction markets"* — pipe `vibe-dash signals` into a report template
+
+**Traders**
+- *"Compare odds across Polymarket and Kalshi for arbitrage"* — `vibe-dash arbitrage` finds the cross-platform spreads
+- *"Watch these markets and alert me when probability drops below 30%"* — combine `vibe-dash search --format json` with a threshold script
+
+**Content Creators**
+- *"Generate a daily Twitter thread of the most interesting prediction market moves"* — an agent composes `vibe-dash signals` + `enrich` into a thread
 
 ## License
 

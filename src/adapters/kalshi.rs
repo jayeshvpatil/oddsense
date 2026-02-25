@@ -27,11 +27,13 @@ struct KalshiEvent {
     markets: Vec<KalshiMarket>,
 }
 
-#[derive(Debug, Deserialize, serde::Serialize)]
+#[allow(dead_code)]
+#[derive(Debug, Deserialize)]
 struct KalshiMarket {
     ticker: String,
     title: Option<String>,
     subtitle: Option<String>,
+    yes_sub_title: Option<String>,
     yes_bid: Option<f64>,
     yes_ask: Option<f64>,
     last_price: Option<f64>,
@@ -65,11 +67,17 @@ impl KalshiAdapter {
             .map(|p| p / 100.0)
             .unwrap_or(0.0);
 
-        let title = market
+        // Build a descriptive title: use market title (or event title as fallback),
+        // and append yes_sub_title so multi-outcome events are distinguishable
+        // (e.g. "Who will the next Pope be? — Pietro Parolin").
+        let base_title = market
             .title
             .as_deref()
-            .unwrap_or(&event.title)
-            .to_string();
+            .unwrap_or(&event.title);
+        let title = match &market.yes_sub_title {
+            Some(sub) if !sub.is_empty() => format!("{} — {}", base_title, sub),
+            _ => base_title.to_string(),
+        };
 
         NormalizedMarket {
             id: market.ticker.clone(),
@@ -86,7 +94,7 @@ impl KalshiAdapter {
                 "https://kalshi.com/markets/{}",
                 event.event_ticker.to_lowercase()
             ),
-            source_data: serde_json::to_value(market).unwrap_or(Value::Null),
+            source_data: Value::Null,
         }
     }
 }
@@ -225,6 +233,7 @@ mod tests {
             ticker: "PRES-2028-DEM".to_string(),
             title: Some("Will Democrats win the 2028 election?".to_string()),
             subtitle: Some("Binary market".to_string()),
+            yes_sub_title: Some("Democrats".to_string()),
             yes_bid: Some(45.0),
             yes_ask: Some(47.0),
             last_price: Some(46.0),
@@ -237,6 +246,10 @@ mod tests {
         let normalized = KalshiAdapter::normalize(&event, &market);
         assert_eq!(normalized.source, "kalshi");
         assert_eq!(normalized.id, "PRES-2028-DEM");
+        assert_eq!(
+            normalized.title,
+            "Will Democrats win the 2028 election? — Democrats"
+        );
         assert!((normalized.probability - 0.45).abs() < f64::EPSILON);
         assert_eq!(normalized.volume_24h, Some(50000.0));
         assert_eq!(normalized.category, Some("politics".to_string()));
@@ -254,6 +267,7 @@ mod tests {
             ticker: "TEST-MKT".to_string(),
             title: None,
             subtitle: None,
+            yes_sub_title: None,
             yes_bid: None,
             yes_ask: None,
             last_price: Some(70.0),

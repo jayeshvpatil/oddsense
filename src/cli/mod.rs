@@ -99,7 +99,7 @@ pub enum Commands {
         timeframe: String,
 
         /// Minimum 24h volume filter (USD)
-        #[arg(long, default_value_t = 10000.0)]
+        #[arg(long, default_value_t = 1000.0)]
         min_volume: f64,
 
         /// Max results
